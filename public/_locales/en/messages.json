@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "Fast AI Translator"
+  },
+  "extensionDescription": {
+    "message": "Translate websites into English with a fast OpenAI-compatible AI provider."
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "fast-ai-translator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A fast English website translator for Chrome and Edge using OpenAI-compatible APIs.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wxt",
+    "dev:edge": "wxt -b edge",
+    "build": "wxt build",
+    "build:edge": "wxt build -b edge",
+    "zip": "wxt zip",
+    "zip:edge": "wxt zip -b edge",
+    "icons": "node scripts/generate-icons.mjs",
+    "prepare": "wxt prepare && npm run icons",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm test && npm run build && npm run build:edge"
+  },
+  "dependencies": {
+    "idb": "8.0.3",
+    "lucide-react": "1.27.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@wxt-dev/module-react": "1.2.2",
+    "fake-indexeddb": "6.2.5",
+    "happy-dom": "20.8.4",
+    "sharp": "0.35.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10",
+    "wxt": "0.20.27"
+  }
+}
