@@ -63,11 +63,12 @@ ZIP packages can be generated with `npm run zip` and `npm run zip:edge`.
 
 1. Enter the hosted API base URL, with or without `/v1`.
 2. Enter the Sub2API API key.
-3. Select **Load models** and choose a fast, non-reasoning model for page and writing translation.
+3. Select **Load models** and choose a model for page and writing translation.
 4. For image translation, choose `gpt-5.6-luna` for speed or `gpt-5.6-terra` for small or dense text when those models are available from your provider. Leaving **Image model** blank uses the main model.
-5. Under **Translation behavior**, keep **Strong evidence** for mixed-language pages or choose **Strict English** to minimize requests on English pages.
-6. Select **Test connection** and **Test image model**.
-7. Save the settings and reload the page to translate automatically.
+5. Choose a **Reasoning effort** when the selected model and provider support it, or leave it at **Provider default**.
+6. Under **Translation behavior**, keep **Strong evidence** for mixed-language pages or choose **Strict English** to minimize requests on English pages.
+7. Select **Test connection** and **Test image model**.
+8. Save the settings and reload the page to translate automatically.
 
 The API key is stored in browser extension storage. It is never committed to this repository or inserted into website JavaScript. Page text is sent to the configured provider when translation is enabled. Draft translations are cached only in bounded extension memory; persistent storage contains only the selected target language for recently used hostnames, never draft content.
 

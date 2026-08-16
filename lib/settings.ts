@@ -1,9 +1,14 @@
 import { browser } from 'wxt/browser';
 import { STORAGE_KEYS, TARGET_LANGUAGE } from './constants';
-import type { EnglishPagePolicy, TranslatorSecrets, TranslatorSettings } from './types';
+import type {
+  EnglishPagePolicy,
+  ReasoningEffort,
+  TranslatorSecrets,
+  TranslatorSettings,
+} from './types';
 import { normalizeApiBaseUrl, normalizeDomain } from './url';
 
-const SETTINGS_SCHEMA_VERSION = 5;
+const SETTINGS_SCHEMA_VERSION = 6;
 const LEGACY_DEFAULT_CONCURRENCY = 3;
 
 interface StoredSettings extends Partial<TranslatorSettings> {
@@ -19,6 +24,7 @@ export const DEFAULT_SETTINGS: TranslatorSettings = {
   apiBaseUrl: '',
   model: '',
   imageModel: '',
+  reasoningEffort: '',
   targetLanguage: TARGET_LANGUAGE,
   concurrency: 8,
   useCache: true,
@@ -37,6 +43,14 @@ export function sanitizeSettings(input: Partial<TranslatorSettings>): Translator
     input.englishPagePolicy === 'strong-evidence' || input.englishPagePolicy === 'strict'
       ? input.englishPagePolicy
       : DEFAULT_SETTINGS.englishPagePolicy;
+  const reasoningEffort: ReasoningEffort =
+    input.reasoningEffort === 'low' ||
+    input.reasoningEffort === 'medium' ||
+    input.reasoningEffort === 'high' ||
+    input.reasoningEffort === 'xhigh' ||
+    input.reasoningEffort === 'max'
+      ? input.reasoningEffort
+      : '';
 
   return {
     ...DEFAULT_SETTINGS,
@@ -45,6 +59,7 @@ export function sanitizeSettings(input: Partial<TranslatorSettings>): Translator
     englishPagePolicy,
     model: input.model?.trim() ?? '',
     imageModel: input.imageModel?.trim() ?? '',
+    reasoningEffort,
     targetLanguage: TARGET_LANGUAGE,
     concurrency: Math.min(24, Math.max(1, Math.round(input.concurrency ?? 8))),
     cacheTtlDays: Math.min(365, Math.max(1, Math.round(input.cacheTtlDays ?? 30))),

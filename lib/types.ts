@@ -7,6 +7,7 @@ export type TranslationState =
   | 'error';
 
 export type EnglishPagePolicy = 'strong-evidence' | 'strict';
+export type ReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface TranslatorSettings {
   enabled: boolean;
@@ -17,6 +18,7 @@ export interface TranslatorSettings {
   apiBaseUrl: string;
   model: string;
   imageModel: string;
+  reasoningEffort: ReasoningEffort;
   targetLanguage: 'English';
   concurrency: number;
   useCache: boolean;
@@ -183,6 +185,7 @@ export interface ProviderDraft {
   apiBaseUrl: string;
   apiKey: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 export interface ModelsResponse {

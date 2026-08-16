@@ -15,6 +15,12 @@ describe('translation memory', () => {
     expect(first).not.toBe(second);
   });
 
+  it('changes cache keys when reasoning effort changes', async () => {
+    const first = await buildCacheKey('Bonjour', settings);
+    const second = await buildCacheKey('Bonjour', { ...settings, reasoningEffort: 'high' });
+    expect(first).not.toBe(second);
+  });
+
   it('stores and retrieves translated segments', async () => {
     const cache = new TranslationCache();
     const segments = [{ id: 's1', text: 'Bonjour' }];

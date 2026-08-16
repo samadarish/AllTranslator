@@ -94,8 +94,9 @@ export default function App() {
       apiBaseUrl: settings.apiBaseUrl,
       apiKey: secrets.apiKey,
       model: settings.model,
+      reasoningEffort: settings.reasoningEffort,
     }),
-    [settings.apiBaseUrl, settings.model, secrets.apiKey],
+    [settings.apiBaseUrl, settings.model, settings.reasoningEffort, secrets.apiKey],
   );
 
   const imageDraft = useMemo<ProviderDraft>(
@@ -103,8 +104,9 @@ export default function App() {
       apiBaseUrl: settings.apiBaseUrl,
       apiKey: secrets.apiKey,
       model: settings.imageModel || settings.model,
+      reasoningEffort: settings.reasoningEffort,
     }),
-    [settings.apiBaseUrl, settings.imageModel, settings.model, secrets.apiKey],
+    [settings.apiBaseUrl, settings.imageModel, settings.model, settings.reasoningEffort, secrets.apiKey],
   );
 
   const modelChoices = useMemo(
@@ -410,6 +412,28 @@ export default function App() {
             )}
             <span className="field-hint">
               Use gpt-5.6-luna for speed, or gpt-5.6-terra for small or dense image text.
+            </span>
+          </div>
+
+          <div className="field">
+            <label htmlFor="reasoning-effort">Reasoning effort</label>
+            <select
+              id="reasoning-effort"
+              value={settings.reasoningEffort}
+              onChange={(event) =>
+                update('reasoningEffort', event.target.value as TranslatorSettings['reasoningEffort'])
+              }
+            >
+              <option value="">Provider default</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="xhigh">Extra high</option>
+              <option value="max">Maximum</option>
+            </select>
+            <span className="field-hint">
+              Applies to page, writing, and image translations. Leave at provider default for models
+              that do not support reasoning effort.
             </span>
           </div>
         </div>

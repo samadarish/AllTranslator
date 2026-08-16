@@ -49,6 +49,7 @@ function currentProviderContext(): Promise<ProviderContext> {
         apiBaseUrl: settings.apiBaseUrl,
         apiKey: secrets.apiKey,
         model: settings.model,
+        reasoningEffort: settings.reasoningEffort,
       };
       return { draft, client: new Sub2ApiClient(draft) };
     },
@@ -63,6 +64,7 @@ function currentImageProviderContext(): Promise<ProviderContext> {
         apiBaseUrl: settings.apiBaseUrl,
         apiKey: secrets.apiKey,
         model: settings.imageModel || settings.model,
+        reasoningEffort: settings.reasoningEffort,
       };
       return { draft, client: new Sub2ApiClient(draft) };
     },
@@ -272,7 +274,7 @@ export async function translateDraft(
   const normalizedRequest = { ...request, targetLanguage };
   const cacheKey = draftCacheKey(
     normalizedRequest,
-    `${context.draft.apiBaseUrl}\u0000${context.draft.model}`,
+    `${context.draft.apiBaseUrl}\u0000${context.draft.model}\u0000${context.draft.reasoningEffort ?? ''}`,
   );
   const cached = draftTranslationCache.get(cacheKey);
   if (cached !== undefined) {
@@ -353,7 +355,7 @@ export async function translateImage(
   const normalizedRequest = { ...request, targetLanguage };
   const cacheKey = await imageCacheKey(
     normalizedRequest,
-    `${context.draft.apiBaseUrl}\u0000${context.draft.model}`,
+    `${context.draft.apiBaseUrl}\u0000${context.draft.model}\u0000${context.draft.reasoningEffort ?? ''}`,
   );
   const cached = imageTranslationCache.get(cacheKey);
   if (cached) {
@@ -470,5 +472,10 @@ export function settingsFromDraft(
   draft: ProviderDraft,
   current: TranslatorSettings,
 ): TranslatorSettings {
-  return sanitizeSettings({ ...current, apiBaseUrl: draft.apiBaseUrl, model: draft.model });
+  return sanitizeSettings({
+    ...current,
+    apiBaseUrl: draft.apiBaseUrl,
+    model: draft.model,
+    reasoningEffort: draft.reasoningEffort,
+  });
 }

@@ -6,9 +6,8 @@ export function normalizeApiBaseUrl(input: string): string {
   if (!/\/v1$/i.test(value)) value = `${value}/v1`;
 
   const url = new URL(value);
-  const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalhost)) {
-    throw new Error('Use HTTPS for remote providers. HTTP is allowed only on localhost.');
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('Use an HTTP or HTTPS provider URL.');
   }
 
   url.hash = '';

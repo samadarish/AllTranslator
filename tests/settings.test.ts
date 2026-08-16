@@ -26,6 +26,7 @@ describe('translator settings', () => {
     expect(DEFAULT_SETTINGS.writingTranslatorEnabled).toBe(true);
     expect(DEFAULT_SETTINGS.imageTranslatorEnabled).toBe(true);
     expect(DEFAULT_SETTINGS.imageModel).toBe('');
+    expect(DEFAULT_SETTINGS.reasoningEffort).toBe('');
     expect(DEFAULT_SETTINGS.englishPagePolicy).toBe('strong-evidence');
     expect(sanitizeSettings({ concurrency: 0 }).concurrency).toBe(1);
     expect(sanitizeSettings({ concurrency: 24 }).concurrency).toBe(24);
@@ -47,8 +48,9 @@ describe('translator settings', () => {
         writingTranslatorEnabled: true,
         imageTranslatorEnabled: true,
         imageModel: '',
+        reasoningEffort: '',
         englishPagePolicy: 'strong-evidence',
-        _schemaVersion: 5,
+        _schemaVersion: 6,
       }),
     });
   });
@@ -66,7 +68,7 @@ describe('translator settings', () => {
     });
     await expect(loadSettings()).resolves.toMatchObject({ concurrency: 3 });
     expect(setStorage).toHaveBeenCalledWith({
-      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 3, _schemaVersion: 5 }),
+      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 3, _schemaVersion: 6 }),
     });
   });
 
@@ -75,7 +77,7 @@ describe('translator settings', () => {
 
     expect(saved.concurrency).toBe(24);
     expect(setStorage).toHaveBeenCalledWith({
-      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 24, _schemaVersion: 5 }),
+      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 24, _schemaVersion: 6 }),
     });
   });
 
@@ -98,7 +100,7 @@ describe('translator settings', () => {
       [SETTINGS_KEY]: expect.objectContaining({
         imageModel: 'vision-model',
         imageTranslatorEnabled: false,
-        _schemaVersion: 5,
+        _schemaVersion: 6,
       }),
     });
   });
@@ -115,7 +117,7 @@ describe('translator settings', () => {
     expect(setStorage).toHaveBeenCalledWith({
       [SETTINGS_KEY]: expect.objectContaining({
         englishPagePolicy: 'strong-evidence',
-        _schemaVersion: 5,
+        _schemaVersion: 6,
       }),
     });
   });
@@ -125,12 +127,20 @@ describe('translator settings', () => {
     getStorage.mockResolvedValue({
       [SETTINGS_KEY]: {
         englishPagePolicy: 'translate-everything' as TranslatorSettings['englishPagePolicy'],
-        _schemaVersion: 5,
+        _schemaVersion: 6,
       },
     });
 
     await expect(loadSettings()).resolves.toMatchObject({
       englishPagePolicy: 'strong-evidence',
     });
+  });
+
+  it('accepts known reasoning efforts and falls back to the provider default', () => {
+    expect(sanitizeSettings({ reasoningEffort: 'high' }).reasoningEffort).toBe('high');
+    expect(
+      sanitizeSettings({ reasoningEffort: 'unsupported' as TranslatorSettings['reasoningEffort'] })
+        .reasoningEffort,
+    ).toBe('');
   });
 });

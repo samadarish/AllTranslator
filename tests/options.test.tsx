@@ -112,7 +112,7 @@ describe('options model picker', () => {
       expect(setStorage).toHaveBeenCalledWith({
         'fastAiTranslator.settings': expect.objectContaining({
           englishPagePolicy: 'strict',
-          _schemaVersion: 5,
+          _schemaVersion: 6,
         }),
       }),
     );
@@ -141,6 +141,43 @@ describe('options model picker', () => {
     });
   });
 
+  it('saves the selected reasoning effort and uses it when testing the provider', async () => {
+    sendMessage.mockImplementation(async (request?: { type: string }) =>
+      request?.type === 'TEST_CONNECTION'
+        ? {
+            ok: true,
+            message: 'Connection and translation succeeded.',
+            models: ['model-a', 'model-b'],
+            modelsLatencyMs: 40,
+            translationLatencyMs: 245,
+          }
+        : { models: ['model-a', 'model-b'] },
+    );
+    render(<App />);
+    const model = await screen.findByRole('combobox', { name: 'Model' });
+    await waitFor(() => expect(model).toHaveValue('model-a'));
+    const effort = await screen.findByRole('combobox', { name: 'Reasoning effort' });
+    fireEvent.change(effort, { target: { value: 'high' } });
+    setStorage.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'TEST_CONNECTION',
+      draft: expect.objectContaining({ reasoningEffort: 'high' }),
+    });
+
+    await screen.findByText(/Connection and translation succeeded.*245 ms/);
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() =>
+      expect(setStorage).toHaveBeenCalledWith({
+        'fastAiTranslator.settings': expect.objectContaining({
+          reasoningEffort: 'high',
+          _schemaVersion: 6,
+        }),
+      }),
+    );
+  });
+
   it('keeps a stored custom image model editable when model discovery fails', async () => {
     getStorage.mockImplementation(async (key: string): Promise<Record<string, unknown>> => {
       if (key === 'fastAiTranslator.settings') {
@@ -149,7 +186,7 @@ describe('options model picker', () => {
             apiBaseUrl: 'https://api.example.com/v1',
             model: 'text-model',
             imageModel: 'custom-vision-model',
-            _schemaVersion: 5,
+            _schemaVersion: 6,
           },
         };
       }

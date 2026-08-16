@@ -35,6 +35,7 @@ export async function buildCacheKey(text: string, settings: TranslatorSettings):
     JSON.stringify({
       promptVersion: PROMPT_VERSION,
       model: settings.model,
+      reasoningEffort: settings.reasoningEffort,
       target: settings.targetLanguage,
       text: text.trim().replace(/\s+/g, ' '),
     }),

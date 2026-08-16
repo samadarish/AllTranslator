@@ -97,6 +97,7 @@ describe('Sub2API client', () => {
       apiBaseUrl: 'https://api.example.com',
       apiKey: 'secret-test-key',
       model: 'gpt-5-nano',
+      reasoningEffort: 'high',
     });
     const result = await client.translate({
       mode: 'page',
@@ -116,6 +117,7 @@ describe('Sub2API client', () => {
     expect(url).toBe('https://api.example.com/v1/chat/completions');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer secret-test-key');
     expect(init.body).toContain('gpt-5-nano');
+    expect(JSON.parse(init.body as string)).toMatchObject({ reasoning_effort: 'high' });
   });
 
   it('surfaces rate-limit retry timing', async () => {

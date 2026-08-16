@@ -409,6 +409,7 @@ export class Sub2ApiClient {
         },
         body: JSON.stringify({
           model: this.draft.model.trim(),
+          ...(this.draft.reasoningEffort ? { reasoning_effort: this.draft.reasoningEffort } : {}),
           stream: false,
           messages: [
             {

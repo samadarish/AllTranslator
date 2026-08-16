@@ -26,9 +26,15 @@ describe('provider URL handling', () => {
     );
   });
 
-  it('rejects insecure remote endpoints while allowing localhost', () => {
-    expect(() => normalizeApiBaseUrl('http://api.example.com')).toThrow(/HTTPS/);
+  it('accepts HTTP endpoints, including remote providers', () => {
+    expect(normalizeApiBaseUrl('http://103.216.171.59:8080')).toBe(
+      'http://103.216.171.59:8080/v1',
+    );
     expect(normalizeApiBaseUrl('http://localhost:8080')).toBe('http://localhost:8080/v1');
+  });
+
+  it('rejects unsupported URL protocols', () => {
+    expect(() => normalizeApiBaseUrl('ftp://api.example.com')).toThrow(/HTTP or HTTPS/);
   });
 });
 
