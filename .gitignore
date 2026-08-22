@@ -1,6 +1,5 @@
 node_modules/
 .wxt/
-.output/
 coverage/
 *.log
 .DS_Store
