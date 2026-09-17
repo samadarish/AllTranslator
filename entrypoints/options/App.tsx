@@ -33,6 +33,7 @@ import type {
   TranslatorSettings,
 } from '../../lib/types';
 import { normalizeDomain } from '../../lib/url';
+import { TargetLanguagePicker } from '../../lib/target-language-picker';
 
 type Notice = { kind: 'success' | 'error'; message: string } | undefined;
 
@@ -523,8 +524,8 @@ export default function App() {
           </div>
           <div className="setting-row">
             <div>
-              <strong>Target language</strong>
-              <span>Version 1 translates into English</span>
+              <strong>Page target language</strong>
+              <span>Webpages and dropdown labels translate into English</span>
             </div>
             <output className="fixed-value">English</output>
           </div>
@@ -544,6 +545,33 @@ export default function App() {
             />
           </div>
         </div>
+      </section>
+
+      <section className="settings-section shortcut-settings" aria-labelledby="writing-shortcuts-heading">
+        <div className="section-heading">
+          <div>
+            <h2 id="writing-shortcuts-heading">Writing shortcuts</h2>
+            <p>Translate selected text or your whole draft and replace it immediately. You send it when ready.</p>
+          </div>
+        </div>
+        <div className="shortcut-grid">
+          {settings.writingShortcuts.map((target, index) => (
+            <div className="shortcut-row" key={index}>
+              <kbd>Alt + Shift + {index + 1}</kbd>
+              <TargetLanguagePicker
+                target={target}
+                ariaLabel={`Language for Alt + Shift + ${index + 1}`}
+                onTarget={(language) => update('writingShortcuts', settings.writingShortcuts.map(
+                  (current, slot) => slot === index ? language : current,
+                ))}
+                onClear={() => update('writingShortcuts', settings.writingShortcuts.map(
+                  (current, slot) => slot === index ? null : current,
+                ))}
+              />
+            </div>
+          ))}
+        </div>
+        <p className="shortcut-hint">Save settings to apply these shortcuts to open tabs. Alt + Shift + Enter opens a preview; press it again to replace. Escape cancels.</p>
       </section>
 
       <section className="settings-section">

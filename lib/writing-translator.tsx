@@ -24,6 +24,7 @@ import {
 } from './writing-languages';
 import { loadWritingTarget, rememberWritingTarget } from './writing-preferences';
 import { TargetLanguagePicker } from './target-language-picker';
+import { normalizeWritingShortcuts } from './writing-shortcuts';
 
 type TranslationPhase = 'idle' | 'loading' | 'success' | 'error';
 
@@ -44,6 +45,8 @@ interface WritingTranslatorViewProps {
   preview: string;
   error: string;
   translatingSelection: boolean;
+  shortcuts: Array<TargetLanguage | null>;
+  autoReplace: boolean;
   onOpen: () => void;
   onClose: () => void;
   onRetry: () => void;
@@ -196,6 +199,8 @@ input:focus-visible {
 }
 .preview-label { margin: 0 0 8px; color: #697570; font-size: 10px; font-weight: 700; text-transform: uppercase; }
 .preview-text { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.shortcut-hints { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid #e0e5e2; color: #697570; font-size: 11px; }
+.shortcut-hints span { display: block; margin-top: 4px; }
 .status-line { display: flex; min-height: 100px; align-items: center; justify-content: center; gap: 8px; color: #5e6a66; text-align: center; }
 .status-error { align-items: flex-start; color: #96372f; }
 .error-block { display: grid; gap: 12px; justify-items: start; }
@@ -256,7 +261,7 @@ function WritingTranslatorView(props: WritingTranslatorViewProps) {
         className="writing-button"
         type="button"
         style={iconStyle}
-        title="Translate writing"
+        title={`Translate writing (Alt + Shift + Enter)${props.shortcuts.map((target, index) => target ? `\nAlt + Shift + ${index + 1}: ${target.name}` : '').join('')}`}
         aria-label="Translate writing"
         onPointerDown={(event) => event.preventDefault()}
         onClick={props.onOpen}
@@ -288,7 +293,7 @@ function WritingTranslatorView(props: WritingTranslatorViewProps) {
             {props.phase === 'loading' && (
               <div className="status-line">
                 <LoaderCircle className="spin" size={18} />
-                <span>Translating...</span>
+                <span>{props.autoReplace ? `Translating to ${props.target.name} and replacing...` : 'Translating...'}</span>
               </div>
             )}
             {props.phase === 'error' && (
@@ -313,6 +318,12 @@ function WritingTranslatorView(props: WritingTranslatorViewProps) {
                 <p className="preview-text">{props.preview}</p>
               </>
             )}
+            <div className="shortcut-hints">
+              Alt + Shift + Enter: preview and confirm
+              {props.shortcuts.map((target, index) => target && (
+                <span key={index}>Alt + Shift + {index + 1}: {target.name} (replace directly)</span>
+              ))}
+            </div>
           </div>
 
           <footer className="popover-footer">
@@ -371,6 +382,8 @@ export class WritingTranslator {
   private requestSequence = 0;
   private activeRequestId?: string;
   private targetTouched = false;
+  private shortcuts = normalizeWritingShortcuts();
+  private autoReplace = false;
   private position: AnchorPosition = { iconLeft: 8, iconTop: 8, popoverLeft: 8, popoverTop: 48 };
 
   private readonly handleFocusIn = (event: FocusEvent) => {
@@ -387,6 +400,16 @@ export class WritingTranslator {
     const editor = findWritingEditor(path);
     if (editor) this.setEditor(editor);
     else this.clearEditor();
+  };
+
+  private readonly handleFocusOut = (event: FocusEvent) => {
+    if (this.autoReplace && this.activeRequestId && this.editor && event.composedPath().includes(this.editor)) {
+      this.clearEditor();
+    }
+  };
+
+  private readonly handleWindowBlur = () => {
+    if (this.autoReplace && this.activeRequestId) this.clearEditor();
   };
 
   private readonly handleInput = (event: Event) => {
@@ -406,9 +429,22 @@ export class WritingTranslator {
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
+    if (event.isComposing || event.keyCode === 229 || event.repeat) return;
     if (event.key === 'Escape' && this.open) {
       event.preventDefault();
       this.close();
+      return;
+    }
+    if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && /^Digit[1-9]$/.test(event.code)) {
+      const target = this.shortcuts[Number(event.code.slice(-1)) - 1];
+      const editor = findWritingEditor(event.composedPath());
+      const active = deepestActiveElement(this.document);
+      if (!target || !editor || !active || (active !== editor && !editor.contains(active))) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setEditor(editor);
+      this.rememberTarget(target);
+      this.beginTranslation(true);
       return;
     }
     if (
@@ -464,24 +500,33 @@ export class WritingTranslator {
     this.enabled = enabled;
     if (enabled) {
       this.document.addEventListener('focusin', this.handleFocusIn, true);
+      this.document.addEventListener('focusout', this.handleFocusOut, true);
       this.document.addEventListener('pointerdown', this.handlePointerDown, true);
       this.document.addEventListener('input', this.handleInput, true);
       this.document.addEventListener('keydown', this.handleKeyDown, true);
       this.document.addEventListener('scroll', this.handleViewportChange, true);
       this.document.defaultView?.addEventListener('resize', this.handleViewportChange);
+      this.document.defaultView?.addEventListener('blur', this.handleWindowBlur);
       const active = deepestActiveElement(this.document);
       const editor = active ? findWritingEditor(eventPathFromElement(active)) : undefined;
       if (editor) this.setEditor(editor);
       void this.loadRememberedTarget();
     } else {
       this.document.removeEventListener('focusin', this.handleFocusIn, true);
+      this.document.removeEventListener('focusout', this.handleFocusOut, true);
       this.document.removeEventListener('pointerdown', this.handlePointerDown, true);
       this.document.removeEventListener('input', this.handleInput, true);
       this.document.removeEventListener('keydown', this.handleKeyDown, true);
       this.document.removeEventListener('scroll', this.handleViewportChange, true);
       this.document.defaultView?.removeEventListener('resize', this.handleViewportChange);
+      this.document.defaultView?.removeEventListener('blur', this.handleWindowBlur);
       this.clearEditor();
     }
+    this.render();
+  }
+
+  setShortcuts(shortcuts: Array<TargetLanguage | null>): void {
+    this.shortcuts = normalizeWritingShortcuts(shortcuts);
     this.render();
   }
 
@@ -511,6 +556,7 @@ export class WritingTranslator {
       this.preview = '';
       this.error = '';
       this.snapshot = undefined;
+      this.autoReplace = false;
       this.editor = editor;
     }
     this.updatePosition();
@@ -521,6 +567,7 @@ export class WritingTranslator {
     this.cancelActiveRequest();
     this.editor = undefined;
     this.snapshot = undefined;
+    this.autoReplace = false;
     this.open = false;
     this.phase = 'idle';
     this.preview = '';
@@ -553,7 +600,13 @@ export class WritingTranslator {
   }
 
   private openTranslator = (): void => {
+    this.beginTranslation(false);
+  };
+
+  private beginTranslation(autoReplace: boolean): void {
     if (!this.editor || !isEligibleWritingEditor(this.editor)) return;
+    this.cancelActiveRequest();
+    this.autoReplace = autoReplace;
     this.open = true;
     const snapshot = captureDraftSnapshot(this.editor);
     if (!snapshot) {
@@ -566,10 +619,11 @@ export class WritingTranslator {
     }
     this.snapshot = snapshot;
     void this.requestTranslation(snapshot);
-  };
+  }
 
   private retry = (): void => {
     if (!this.editor) return;
+    if (this.autoReplace) this.editor.focus({ preventScroll: true });
     const snapshot =
       this.snapshot && isDraftSnapshotCurrent(this.snapshot)
         ? this.snapshot
@@ -587,9 +641,8 @@ export class WritingTranslator {
   private selectTarget = (input: TargetLanguage): void => {
     const target = validateTargetLanguage(input);
     if (!target) return;
-    this.target = target;
-    this.targetTouched = true;
-    void rememberWritingTarget(this.document.location.hostname, target).catch(() => undefined);
+    this.autoReplace = false;
+    this.rememberTarget(target);
     if (this.editor) {
       const snapshot =
         this.snapshot && isDraftSnapshotCurrent(this.snapshot)
@@ -602,6 +655,12 @@ export class WritingTranslator {
     }
     this.render();
   };
+
+  private rememberTarget(target: TargetLanguage): void {
+    this.target = target;
+    this.targetTouched = true;
+    void rememberWritingTarget(this.document.location.hostname, target).catch(() => undefined);
+  }
 
   private async requestTranslation(snapshot: DraftSnapshot): Promise<void> {
     this.cancelActiveRequest();
@@ -628,6 +687,16 @@ export class WritingTranslator {
       } else {
         this.phase = 'success';
         this.preview = response.translation;
+        if (this.autoReplace) {
+          const active = deepestActiveElement(this.document);
+          if (!this.enabled || !isEligibleWritingEditor(snapshot.editor) || !active ||
+            (active !== snapshot.editor && !snapshot.editor.contains(active))) {
+            this.clearEditor();
+            return;
+          }
+          this.replace();
+          return;
+        }
       }
     } catch (error) {
       if (this.activeRequestId !== requestId) return;
@@ -668,6 +737,7 @@ export class WritingTranslator {
     this.preview = '';
     this.error = '';
     this.snapshot = undefined;
+    this.autoReplace = false;
     this.editor?.focus({ preventScroll: true });
     this.updatePosition();
     this.render();
@@ -688,6 +758,8 @@ export class WritingTranslator {
         preview={this.preview}
         error={this.error}
         translatingSelection={translatingSelection}
+        shortcuts={this.shortcuts}
+        autoReplace={this.autoReplace}
         onOpen={this.openTranslator}
         onClose={this.close}
         onRetry={this.retry}

@@ -14,6 +14,7 @@ export interface TranslatorSettings {
   autoTranslate: boolean;
   englishPagePolicy: EnglishPagePolicy;
   writingTranslatorEnabled: boolean;
+  writingShortcuts: Array<TargetLanguage | null>;
   imageTranslatorEnabled: boolean;
   apiBaseUrl: string;
   model: string;

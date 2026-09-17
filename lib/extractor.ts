@@ -45,7 +45,15 @@ interface AttributeTarget {
   attribute: TranslatableAttribute;
 }
 
-export type CandidateTarget = TextTarget | AttributeTarget;
+interface SelectLabelTarget {
+  kind: 'select-label';
+  element: HTMLOptionElement | HTMLOptGroupElement;
+  attribute: 'label';
+  originalLabel: string | null;
+  originalText: string | null;
+}
+
+export type CandidateTarget = TextTarget | AttributeTarget | SelectLabelTarget;
 
 export interface TranslationCandidate {
   id: string;
@@ -147,6 +155,27 @@ function whitespaceParts(value: string): { prefix: string; core: string; suffix:
     prefix: match?.[1] ?? '',
     core: match?.[2] ?? value,
     suffix: match?.[3] ?? '',
+  };
+}
+
+function selectLabelCandidate(
+  element: Element,
+  pageLanguage: string,
+  nextId: () => string,
+  deferLanguageCheck: boolean,
+): TranslationCandidate | undefined {
+  if (!(element instanceof HTMLOptionElement || element instanceof HTMLOptGroupElement)) return;
+  const select = element.closest('select');
+  if (!select || isAttributeSkipped(element) || select.matches('[translate="no"]')) return;
+  const originalLabel = element.getAttribute('label');
+  const originalText = element instanceof HTMLOptionElement ? element.textContent : null;
+  const value = originalLabel || (element instanceof HTMLOptionElement ? element.text : '');
+  const { prefix, core, suffix } = whitespaceParts(value);
+  if (!(deferLanguageCheck ? isPotentiallyTranslatableText(core) : shouldTranslateText(core, pageLanguage))) return;
+  return {
+    id: nextId(), source: core, prefix, suffix,
+    target: { kind: 'select-label', element, attribute: 'label', originalLabel, originalText },
+    observedElement: select,
   };
 }
 
@@ -329,6 +358,9 @@ function candidateClientRects(
   candidate: TranslationCandidate,
   document: Document,
 ): Array<DOMRect | DOMRectReadOnly> {
+  if (candidate.target.kind === 'select-label') {
+    return [candidate.observedElement.getBoundingClientRect()];
+  }
   if (candidate.target.kind === 'attribute') {
     return [candidate.target.element.getBoundingClientRect()];
   }
@@ -374,6 +406,8 @@ function candidatePosition(
   document: Document,
 ): { top: number; left: number } | undefined {
   if (!candidate.observedElement.isConnected) return undefined;
+  if (candidate.target.kind === 'select-label' &&
+    (!candidate.target.element.isConnected || !isStyleVisible(candidate.target.element, document))) return undefined;
   const rects = candidateClientRects(candidate, document);
   const visibleRects = rects.filter((rect) =>
     clipRectToVisibleArea(rect, candidate.observedElement, document),
@@ -476,6 +510,8 @@ export function extractCandidates(
         if (seenAttributeElements.has(element)) continue;
         seenAttributeElements.add(element);
         if (isAttributeSkipped(element)) continue;
+        const labelCandidate = selectLabelCandidate(element, pageLanguage, nextId, deferLanguageCheck);
+        if (labelCandidate && addCandidate(labelCandidate, ownerDocument) === 'full') break extraction;
         for (const attribute of attributesForExtraction(element, textOnly, visibleOnly)) {
           const value = element.getAttribute(attribute) ?? '';
           const shouldInclude = deferLanguageCheck
@@ -653,6 +689,11 @@ export function createVisibleCandidateCollector(
       if (seenAttributeElements.has(node)) return undefined;
       seenAttributeElements.add(node);
       if (isAttributeSkipped(node)) return undefined;
+      const labelCandidate = selectLabelCandidate(node, pageLanguage, nextId, deferLanguageCheck);
+      if (labelCandidate && ownerDocument) {
+        const position = candidatePosition(labelCandidate, ownerDocument);
+        return position ? { candidate: labelCandidate, position } : undefined;
+      }
       const [attribute] = attributesForExtraction(node, options.textOnly ?? false, true);
       if (!attribute) return undefined;
       const value = node.getAttribute(attribute) ?? '';
@@ -735,6 +776,11 @@ export function currentCandidateValue(candidate: TranslationCandidate): string |
     return candidate.target.node.isConnected ? candidate.target.node.nodeValue : null;
   }
   if (!candidate.target.element.isConnected) return null;
+  if (candidate.target.kind === 'select-label') {
+    const { element, originalText } = candidate.target;
+    if (originalText !== null && element.textContent !== originalText) return null;
+    return element.getAttribute('label') || (element instanceof HTMLOptionElement ? element.text : '');
+  }
   return candidate.target.element.getAttribute(candidate.target.attribute);
 }
 
@@ -746,7 +792,7 @@ export function translatedCandidateValue(
   candidate: TranslationCandidate,
   translation: string,
 ): string {
-  return candidate.target.kind === 'text'
+  return candidate.target.kind !== 'attribute'
     ? `${candidate.prefix}${translation}${candidate.suffix}`
     : translation;
 }
@@ -762,6 +808,14 @@ export function applyCandidate(candidate: TranslationCandidate, translation: str
 }
 
 export function restoreCandidate(candidate: TranslationCandidate): boolean {
+  if (candidate.target.kind === 'select-label') {
+    const { element, originalLabel } = candidate.target;
+    if (!candidate.translated || element.getAttribute('label') !== candidate.translated) return false;
+    if (originalLabel === null) element.removeAttribute('label');
+    else element.setAttribute('label', originalLabel);
+    candidate.translated = undefined;
+    return true;
+  }
   if (!candidate.translated || currentCandidateValue(candidate) !== candidate.translated) return false;
   const original = originalCandidateValue(candidate);
   if (candidate.target.kind === 'text') candidate.target.node.nodeValue = original;

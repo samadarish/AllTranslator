@@ -112,7 +112,7 @@ describe('options model picker', () => {
       expect(setStorage).toHaveBeenCalledWith({
         'fastAiTranslator.settings': expect.objectContaining({
           englishPagePolicy: 'strict',
-          _schemaVersion: 6,
+          _schemaVersion: 7,
         }),
       }),
     );
@@ -172,10 +172,42 @@ describe('options model picker', () => {
       expect(setStorage).toHaveBeenCalledWith({
         'fastAiTranslator.settings': expect.objectContaining({
           reasoningEffort: 'high',
-          _schemaVersion: 6,
+          _schemaVersion: 7,
         }),
       }),
     );
+  });
+
+  it('assigns, clears, and saves writing shortcuts including custom languages', async () => {
+    render(<App />);
+    await screen.findByRole('combobox', { name: 'Model' });
+    const first = screen.getByRole('button', { name: 'Language for Alt + Shift + 1' });
+    expect(first).toHaveTextContent('English');
+    fireEvent.click(first);
+    fireEvent.click(screen.getByRole('option', { name: 'Unassigned' }));
+    expect(first).toHaveTextContent('Unassigned');
+
+    const second = screen.getByRole('button', { name: 'Language for Alt + Shift + 2' });
+    fireEvent.click(first);
+    fireEvent.blur(first, { relatedTarget: second });
+    expect(screen.queryByRole('listbox', { name: 'Target language' })).not.toBeInTheDocument();
+    fireEvent.click(second);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search languages' }), { target: { value: 'Hindi' } });
+    fireEvent.click(screen.getByRole('option', { name: 'Hindi hi' }));
+    expect(second).toHaveTextContent('Hindi');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Language for Alt + Shift + 3' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom language' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Custom language name' }), { target: { value: 'Esperanto' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Custom language code' }), { target: { value: 'eo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Use language' }));
+    setStorage.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => expect(setStorage).toHaveBeenCalledWith({
+      'fastAiTranslator.settings': expect.objectContaining({
+        writingShortcuts: [null, { code: 'hi', name: 'Hindi' }, { code: 'eo', name: 'Esperanto' }, ...Array(6).fill(null)],
+      }),
+    }));
   });
 
   it('keeps a stored custom image model editable when model discovery fails', async () => {

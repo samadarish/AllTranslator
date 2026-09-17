@@ -7,8 +7,9 @@ import type {
   TranslatorSettings,
 } from './types';
 import { normalizeApiBaseUrl, normalizeDomain } from './url';
+import { normalizeWritingShortcuts } from './writing-shortcuts';
 
-const SETTINGS_SCHEMA_VERSION = 6;
+const SETTINGS_SCHEMA_VERSION = 7;
 const LEGACY_DEFAULT_CONCURRENCY = 3;
 
 interface StoredSettings extends Partial<TranslatorSettings> {
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: TranslatorSettings = {
   autoTranslate: true,
   englishPagePolicy: 'strong-evidence',
   writingTranslatorEnabled: true,
+  writingShortcuts: normalizeWritingShortcuts(),
   imageTranslatorEnabled: true,
   apiBaseUrl: '',
   model: '',
@@ -57,6 +59,7 @@ export function sanitizeSettings(input: Partial<TranslatorSettings>): Translator
     ...input,
     apiBaseUrl,
     englishPagePolicy,
+    writingShortcuts: normalizeWritingShortcuts(input.writingShortcuts),
     model: input.model?.trim() ?? '',
     imageModel: input.imageModel?.trim() ?? '',
     reasoningEffort,

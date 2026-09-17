@@ -23,6 +23,7 @@ export default defineContentScript({
       !isDomainExcluded(location.hostname, settings.excludedDomains);
 
     const updateWritingTranslator = () => {
+      writingTranslator.setShortcuts(response.settings.writingShortcuts);
       writingTranslator.setEnabled(
         canRun(response.settings, response.configured) &&
           response.settings.writingTranslatorEnabled,

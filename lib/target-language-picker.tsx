@@ -7,11 +7,13 @@ import {
 } from './writing-languages';
 
 interface TargetLanguagePickerProps {
-  target: TargetLanguage;
+  target: TargetLanguage | null;
   onTarget: (target: TargetLanguage) => void;
+  onClear?: () => void;
+  ariaLabel?: string;
 }
 
-export function TargetLanguagePicker({ target, onTarget }: TargetLanguagePickerProps) {
+export function TargetLanguagePicker({ target, onTarget, onClear, ariaLabel }: TargetLanguagePickerProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [customOpen, setCustomOpen] = useState(false);
@@ -47,16 +49,25 @@ export function TargetLanguagePicker({ target, onTarget }: TargetLanguagePickerP
   };
 
   return (
-    <div className="target-wrap">
+    <div
+      className="target-wrap"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setPickerOpen(false);
+          setQuery('');
+        }
+      }}
+    >
       <button
         className="target-button"
         type="button"
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={pickerOpen}
         onClick={() => setPickerOpen((open) => !open)}
       >
         <Languages size={15} />
-        <span>{target.name}</span>
+        <span>{target?.name ?? 'Unassigned'}</span>
         <ChevronDown size={14} />
       </button>
       {pickerOpen && (
@@ -72,12 +83,23 @@ export function TargetLanguagePicker({ target, onTarget }: TargetLanguagePickerP
             />
           </label>
           <div className="language-list" role="listbox" aria-label="Target language">
-            {languages.map((language) => (
+            {onClear && (
               <button
-                className={`language-option ${language.code === target.code ? 'selected' : ''}`}
+                className={`language-option ${target === null ? 'selected' : ''}`}
                 type="button"
                 role="option"
-                aria-selected={language.code === target.code}
+                aria-selected={target === null}
+                onClick={() => { setPickerOpen(false); setQuery(''); onClear(); }}
+              >
+                Unassigned
+              </button>
+            )}
+            {languages.map((language) => (
+              <button
+                className={`language-option ${language.code === target?.code ? 'selected' : ''}`}
+                type="button"
+                role="option"
+                aria-selected={language.code === target?.code}
                 key={language.code}
                 onClick={() => chooseTarget(language)}
               >

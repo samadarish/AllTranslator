@@ -246,10 +246,12 @@ export class PageTranslator {
       let shouldScan = false;
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
+          this.invalidateSelectLabel(mutation.target);
           for (const node of mutation.removedNodes) this.removeCandidatesWithin(node);
           const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes];
           shouldScan ||= changedNodes.some((node) => !this.isExtensionOwnedNode(node));
         } else if (mutation.type === 'characterData' && mutation.target instanceof Text) {
+          this.invalidateSelectLabel(mutation.target);
           const id = this.textTargets.get(mutation.target);
           const candidate = id ? this.candidates.get(id) : undefined;
           if (candidate?.translated === mutation.target.nodeValue) continue;
@@ -262,7 +264,7 @@ export class PageTranslator {
             : undefined;
           const candidate = id ? this.candidates.get(id) : undefined;
           if (
-            candidate?.target.kind === 'attribute' &&
+            candidate && candidate.target.kind !== 'text' &&
             candidate.translated === mutation.target.getAttribute(candidate.target.attribute)
           ) {
             continue;
@@ -286,12 +288,22 @@ export class PageTranslator {
         'placeholder',
         'type',
         'value',
+        'label',
       ],
       characterData: true,
       childList: true,
       subtree: true,
     });
     this.mutationObservers.push(observer);
+  }
+
+  private invalidateSelectLabel(node: Node): void {
+    const element = (node instanceof Element ? node : node.parentElement)?.closest('option');
+    if (!element) return;
+    const id = this.attributeTargets.get(element)?.get('label');
+    const candidate = id ? this.candidates.get(id) : undefined;
+    if (candidate?.target.kind !== 'select-label' || element.textContent === candidate.target.originalText) return;
+    this.removeCandidate(candidate.id);
   }
 
   private isExtensionOwnedNode(node: Node): boolean {
@@ -938,7 +950,8 @@ export class PageTranslator {
           candidate.target.kind === 'text' &&
           candidate.target.node === node) ||
         (node instanceof Element &&
-          (node === candidate.observedElement || node.contains(candidate.observedElement)));
+          (node === candidate.observedElement || node.contains(candidate.observedElement) ||
+            (candidate.target.kind !== 'text' && node.contains(candidate.target.element))));
       if (removed) this.removeCandidate(id);
     }
   }
@@ -946,6 +959,7 @@ export class PageTranslator {
   private removeCandidate(id: string): void {
     const candidate = this.candidates.get(id);
     if (!candidate) return;
+    if (candidate.target.kind === 'select-label') restoreCandidate(candidate);
     this.highlightFeedback.remove(candidate);
     this.finishObservation(id);
     if (candidate.target.kind === 'text') this.textTargets.delete(candidate.target.node);
@@ -960,7 +974,8 @@ export class PageTranslator {
 
   private pruneDisconnectedCandidates(): void {
     for (const [id, candidate] of this.candidates) {
-      if (!candidate.observedElement.isConnected) this.removeCandidate(id);
+      if (!candidate.observedElement.isConnected ||
+        (candidate.target.kind !== 'text' && !candidate.target.element.isConnected)) this.removeCandidate(id);
     }
   }
 

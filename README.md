@@ -27,6 +27,12 @@ Fast AI Translator is a Chrome and Edge extension that translates visible websit
 
 Focus a supported editor and select the Languages control, or press `Alt+Shift+Enter`. The translator uses the selected text when there is a selection and the complete draft otherwise. Review the preview and choose **Replace**, or press `Alt+Shift+Enter` again to confirm it. The extension never submits or sends the result.
 
+For immediate replacement while typing, configure **Writing shortcuts** in Settings. Assign a language to any of `Alt+Shift+1` through `Alt+Shift+9`, then select **Save settings**. Assignments apply to open tabs immediately. Slot 1 defaults to English; slots 2–9 start unassigned. Search the language list, enter a custom language, or choose **Unassigned** to disable a slot.
+
+Focus a text field or message editor and press its assigned shortcut. It translates the selected text, or the whole draft if nothing is selected, and replaces it automatically. You still send the message yourself. `Escape` cancels; editing the draft or leaving the editor while translation is pending prevents replacement. `Alt+Shift+Enter` retains the preview-and-confirm workflow.
+
+Page translation also translates native dropdown option and group labels into English while preserving submitted values and selection. **Restore original** restores their original labels. Editable text areas are translated only when you use the writing translator or a typing shortcut.
+
 ## Image translation
 
 Hover or focus a substantial webpage image and select its Languages control. The extension captures the visible part of that image only after the control is selected, translates readable text into English by default, and shows a text preview. Change the target from the searchable language picker, then choose **Copy**. Images are never modified and no action is submitted automatically.

@@ -50,7 +50,7 @@ describe('translator settings', () => {
         imageModel: '',
         reasoningEffort: '',
         englishPagePolicy: 'strong-evidence',
-        _schemaVersion: 6,
+        _schemaVersion: 7,
       }),
     });
   });
@@ -68,7 +68,7 @@ describe('translator settings', () => {
     });
     await expect(loadSettings()).resolves.toMatchObject({ concurrency: 3 });
     expect(setStorage).toHaveBeenCalledWith({
-      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 3, _schemaVersion: 6 }),
+      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 3, _schemaVersion: 7 }),
     });
   });
 
@@ -77,7 +77,7 @@ describe('translator settings', () => {
 
     expect(saved.concurrency).toBe(24);
     expect(setStorage).toHaveBeenCalledWith({
-      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 24, _schemaVersion: 6 }),
+      [SETTINGS_KEY]: expect.objectContaining({ concurrency: 24, _schemaVersion: 7 }),
     });
   });
 
@@ -100,7 +100,7 @@ describe('translator settings', () => {
       [SETTINGS_KEY]: expect.objectContaining({
         imageModel: 'vision-model',
         imageTranslatorEnabled: false,
-        _schemaVersion: 6,
+        _schemaVersion: 7,
       }),
     });
   });
@@ -117,7 +117,7 @@ describe('translator settings', () => {
     expect(setStorage).toHaveBeenCalledWith({
       [SETTINGS_KEY]: expect.objectContaining({
         englishPagePolicy: 'strong-evidence',
-        _schemaVersion: 6,
+        _schemaVersion: 7,
       }),
     });
   });
@@ -142,5 +142,31 @@ describe('translator settings', () => {
       sanitizeSettings({ reasoningEffort: 'unsupported' as TranslatorSettings['reasoningEffort'] })
         .reasoningEffort,
     ).toBe('');
+  });
+
+  it('migrates version 6 with English in the first writing shortcut and the rest unassigned', async () => {
+    getStorage.mockResolvedValue({ [SETTINGS_KEY]: { model: 'fast-model', _schemaVersion: 6 } });
+    const loaded = await loadSettings();
+    expect(loaded.writingShortcuts).toEqual([{ code: 'en', name: 'English' }, ...Array(8).fill(null)]);
+    expect(setStorage).toHaveBeenCalledWith({
+      [SETTINGS_KEY]: expect.objectContaining({ writingShortcuts: loaded.writingShortcuts, _schemaVersion: 7 }),
+    });
+  });
+
+  it('saves assignments, custom languages, and intentionally unassigned slots', async () => {
+    const saved = await saveSettings({ writingShortcuts: [null, { code: 'HI', name: 'Hindi' }, { code: 'eo', name: 'Esperanto' }] });
+    getStorage.mockResolvedValue({ [SETTINGS_KEY]: { ...saved, _schemaVersion: 7 } });
+    const loaded = await loadSettings();
+    expect(loaded.writingShortcuts).toEqual([
+      null, { code: 'hi', name: 'Hindi' }, { code: 'eo', name: 'Esperanto' }, ...Array(6).fill(null),
+    ]);
+    expect(sanitizeSettings({ writingShortcuts: [] }).writingShortcuts).toEqual(Array(9).fill(null));
+  });
+
+  it('sanitizes malformed shortcut entries without shifting their slots', () => {
+    const invalid = [42, { code: null }, { code: 'en', name: 123 }, { code: 'invalid code', name: 'Invalid' }, { code: 'fr', name: 'French' }];
+    expect(sanitizeSettings({ writingShortcuts: invalid as TranslatorSettings['writingShortcuts'] }).writingShortcuts)
+      .toEqual([null, null, null, null, { code: 'fr', name: 'French' }, ...Array(4).fill(null)]);
+    expect(sanitizeSettings({ writingShortcuts: Array(12).fill(null) }).writingShortcuts).toHaveLength(9);
   });
 });

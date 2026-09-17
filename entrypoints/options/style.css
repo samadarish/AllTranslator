@@ -481,6 +481,30 @@ button:disabled {
   animation: spin 900ms linear infinite;
 }
 
+.shortcut-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+.shortcut-row { min-width: 0; padding: 12px; border: 1px solid #d7dfda; border-radius: 8px; background: #f7faf8; }
+.shortcut-row kbd { display: block; margin-bottom: 8px; color: #315b50; font-family: inherit; font-size: 11px; font-weight: 650; }
+.shortcut-hint { margin: 16px 0 0; color: #6b7772; font-size: 11px; line-height: 1.6; }
+.shortcut-settings .target-wrap { position: relative; min-width: 0; }
+.shortcut-settings .target-wrap:focus-within { z-index: 3; }
+.shortcut-settings .target-button { display: flex; width: 100%; align-items: center; gap: 7px; border: 1px solid #cbd4d0; border-radius: 6px; padding: 9px; color: #24443d; background: #fff; font-size: 12px; }
+.shortcut-settings .target-button span { flex: 1; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.shortcut-settings .target-button svg { flex: 0 0 auto; }
+.shortcut-settings .picker { position: absolute; top: 42px; left: 0; z-index: 4; width: min(300px, calc(100vw - 76px)); border: 1px solid #cbd4d0; border-radius: 7px; background: #fff; box-shadow: 0 8px 24px rgb(20 31 28 / 20%); }
+.shortcut-row:nth-child(3n) .picker { right: 0; left: auto; }
+.shortcut-settings .search-row { display: block; position: relative; padding: 8px; border-bottom: 1px solid #e3e8e5; }
+.shortcut-settings .search-row svg { position: absolute; top: 18px; left: 17px; color: #6d7975; }
+.shortcut-settings .search-row input { width: 100%; padding-left: 31px; }
+.shortcut-settings .language-list { max-height: 200px; overflow: auto; padding: 4px; }
+.shortcut-settings .language-option { display: flex; width: 100%; min-height: 34px; align-items: center; justify-content: space-between; gap: 12px; border: 0; border-radius: 5px; padding: 7px 8px; color: #25332f; background: transparent; font-size: 12px; text-align: left; }
+.shortcut-settings .language-option:hover, .shortcut-settings .language-option.selected { background: #edf4f1; }
+.shortcut-settings .language-option small { color: #78837f; font-size: 10px; }
+.shortcut-settings .custom-toggle { border-top: 1px solid #e3e8e5; color: #315c52; font-weight: 650; }
+.shortcut-settings .custom-grid { display: grid; grid-template-columns: 1fr 80px; gap: 7px; padding: 8px; border-top: 1px solid #e3e8e5; }
+.shortcut-settings .custom-grid input { min-width: 0; width: 100%; }
+.shortcut-settings .custom-error { grid-column: 1 / -1; margin: 0; color: #a53a32; font-size: 11px; }
+.shortcut-settings .custom-grid .command { grid-column: 1 / -1; justify-self: end; border: 1px solid #c9d2ce; border-radius: 6px; padding: 7px 10px; color: #34443f; background: #f7faf8; font-size: 12px; }
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -488,6 +512,8 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
+  .shortcut-grid { grid-template-columns: 1fr; }
+  .shortcut-row:nth-child(3n) .picker { right: auto; left: 0; }
   .settings-page {
     width: min(100% - 24px, 880px);
     padding-top: 20px;

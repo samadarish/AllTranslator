@@ -152,6 +152,50 @@ describe('viewport translation', () => {
     vi.unstubAllGlobals();
   });
 
+  it('translates dynamic dropdown labels without changing values or repeatedly translating its own updates', async () => {
+    document.body.innerHTML = '<form><select name="direction"><option selected>其他源头</option></select></form>';
+    const select = document.querySelector('select')!;
+    const option = select.options[0]!;
+    select.selectedIndex = 0;
+    setRect(select, 100);
+    const labels: Record<string, string> = {
+      '其他源头': 'Other source', '卡网': 'Card network', '订阅渠道': 'Subscription channel', '网站更新': 'Site update',
+    };
+    mockEmptyCacheAndProvider((text) => labels[text] ?? 'Translated');
+    const translator = new PageTranslator(settings, document);
+    try {
+      await translator.start();
+      await vi.waitFor(() => expect(option.getAttribute('label')).toBe('Other source'));
+      expect(option.textContent).toBe('其他源头');
+      expect(new FormData(document.querySelector('form')!).get('direction')).toBe('其他源头');
+
+      const dynamicOption = document.createElement('option');
+      dynamicOption.textContent = '卡网';
+      dynamicOption.value = 'cards';
+      select.append(dynamicOption);
+      await vi.waitFor(() => expect(dynamicOption.getAttribute('label')).toBe('Card network'));
+      expect(dynamicOption.value).toBe('cards');
+
+      option.textContent = '订阅渠道';
+      await vi.waitFor(() => expect(option.getAttribute('label')).toBe('Subscription channel'));
+      option.setAttribute('label', '网站更新');
+      await vi.waitFor(() => expect(option.getAttribute('label')).toBe('Site update'));
+      expect(select.selectedIndex).toBe(0);
+      expect(providerRequests().flatMap((request) => request.payload!.segments.map((segment) => segment.text)))
+        .toEqual(['其他源头', '卡网', '订阅渠道', '网站更新']);
+
+      dynamicOption.remove();
+      await vi.waitFor(() => expect(dynamicOption.hasAttribute('label')).toBe(false));
+      select.append(dynamicOption);
+      await vi.waitFor(() => expect(dynamicOption.getAttribute('label')).toBe('Card network'));
+      translator.restore();
+      expect(option.getAttribute('label')).toBe('网站更新');
+      expect(dynamicOption.hasAttribute('label')).toBe(false);
+    } finally {
+      translator.restore();
+    }
+  });
+
   it('translates only foreign content currently on screen', async () => {
     document.body.innerHTML = `
       <header><button>Open settings</button></header>

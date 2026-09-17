@@ -50,6 +50,66 @@ beforeEach(() => {
 });
 
 describe('DOM extraction', () => {
+  it('translates dropdown labels while preserving values, text, selection, and original attributes', () => {
+    document.body.innerHTML = `<form><select name="direction">
+      <option value="api">API 中转</option>
+      <optgroup label="订阅渠道"><option selected>其他源头</option>
+      <option label="卡网" value="cards">Internal text</option><option label="">默认标签</option></optgroup>
+    </select></form>`;
+    const select = document.querySelector('select')!;
+    const originalText = [...select.options].map((option) => option.textContent);
+    const originalValues = [...select.options].map((option) => option.value);
+    const candidates = extractCandidates(document, 'zh', nextId).filter((candidate) => candidate.target.kind === 'select-label');
+    expect(candidates.map((candidate) => candidate.source)).toEqual(['API 中转', '订阅渠道', '其他源头', '卡网', '默认标签']);
+    for (const candidate of candidates) expect(applyCandidate(candidate, 'Translated label')).toBe(true);
+    expect([...select.options].map((option) => option.getAttribute('label'))).toEqual(Array(4).fill('Translated label'));
+    expect([...select.options].map((option) => option.textContent)).toEqual(originalText);
+    expect([...select.options].map((option) => option.value)).toEqual(originalValues);
+    expect(select.selectedIndex).toBe(1);
+    expect(new FormData(document.querySelector('form')!).get('direction')).toBe('其他源头');
+    for (const candidate of candidates) expect(restoreCandidate(candidate)).toBe(true);
+    expect(select.options[0]!.hasAttribute('label')).toBe(false);
+    expect(select.options[1]!.hasAttribute('label')).toBe(false);
+    expect(select.options[2]!.getAttribute('label')).toBe('卡网');
+    expect(select.options[3]!.getAttribute('label')).toBe('');
+    expect(select.querySelector('optgroup')!.getAttribute('label')).toBe('订阅渠道');
+  });
+
+  it('uses the visible select for collapsed option visibility in both collectors', async () => {
+    document.body.innerHTML = `<select><option>其他源头</option><option hidden>隐藏选项</option></select>
+      <select hidden><option>秘密选项</option></select><textarea>不自动更改草稿</textarea>`;
+    const select = document.querySelector('select')!;
+    setRect(select, 100, 40, 240, 40);
+    const candidates = extractCandidates(document, 'zh', nextId, true, { visibleOnly: true, textOnly: true });
+    expect(candidates.map((candidate) => candidate.source)).toEqual(['其他源头']);
+    expect(isCandidateInViewport(candidates[0]!, document)).toBe(true);
+    const collector = createVisibleCandidateCollector(document, 'zh', nextId, true);
+    const sources: string[] = [];
+    let done = false;
+    while (!done) {
+      const slice = await collector.nextSlice();
+      sources.push(...slice.candidates.map((candidate) => candidate.source));
+      done = slice.done;
+    }
+    expect(sources).toEqual(['其他源头']);
+    expect(document.querySelector('textarea')!.value).toBe('不自动更改草稿');
+    setRect(select, 2000, 40, 240, 40);
+    expect(isCandidateInViewport(candidates[0]!, document)).toBe(false);
+  });
+
+  it('rejects stale option translations and preserves website changes on restore', () => {
+    document.body.innerHTML = '<select><option>其他源头</option></select>';
+    const option = document.querySelector('option')!;
+    const [candidate] = extractCandidates(document, 'zh', nextId);
+    option.textContent = '网站已更新';
+    expect(applyCandidate(candidate!, 'Other source')).toBe(false);
+    const [updated] = extractCandidates(document, 'zh', nextId);
+    expect(applyCandidate(updated!, 'Updated by site')).toBe(true);
+    option.setAttribute('label', 'Website label');
+    expect(restoreCandidate(updated!)).toBe(false);
+    expect(option.getAttribute('label')).toBe('Website label');
+  });
+
   it('extracts visible text and safe display attributes', () => {
     document.body.innerHTML = `
       <main>

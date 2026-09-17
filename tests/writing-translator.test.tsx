@@ -1,4 +1,5 @@
-import { fireEvent } from '@testing-library/react';
+import { cleanup, fireEvent, render } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WritingTranslator } from '../lib/writing-translator';
 
@@ -17,6 +18,21 @@ vi.mock('wxt/browser', () => ({
 
 function writingShadow(): ShadowRoot {
   return document.querySelector('[data-fast-ai-translator="writing-ui"]')!.shadowRoot!;
+}
+
+function shortcut(editor: Element, slot = 1, extra: KeyboardEventInit = {}): boolean {
+  return fireEvent.keyDown(editor, { code: `Digit${slot}`, key: '!', altKey: true, shiftKey: true, ...extra });
+}
+
+function delayDraftResponses(): Array<(translation: string) => void> {
+  const responses: Array<(translation: string) => void> = [];
+  sendMessage.mockImplementation((request: { type: string; payload?: { requestId: string } }) => {
+    if (request.type !== 'TRANSLATE_DRAFT') return Promise.resolve({ cancelled: true });
+    return new Promise((resolve) => responses.push((translation) => resolve({
+      requestId: request.payload!.requestId, translation, providerMs: 5, requestCount: 1,
+    })));
+  });
+  return responses;
 }
 
 describe('writing translator controller', () => {
@@ -43,6 +59,7 @@ describe('writing translator controller', () => {
   afterEach(() => {
     translator?.destroy();
     translator = undefined;
+    cleanup();
   });
 
   it('translates the current selection, previews it, and replaces only after confirmation', async () => {
@@ -154,5 +171,152 @@ describe('writing translator controller', () => {
     fireEvent.click(writingShadow().querySelector('button.command-primary')!);
     await vi.waitFor(() => expect(writingShadow().textContent).toContain('draft changed'));
     expect(textarea.value).toBe('Changed');
+  });
+
+  it('uses a physical digit to translate and directly replace the selection without submitting', async () => {
+    document.body.innerHTML = '<form><textarea>Hello world</textarea></form>';
+    const textarea = document.querySelector('textarea')!;
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    document.querySelector('form')!.addEventListener('submit', submit);
+    translator = new WritingTranslator(document);
+    translator.setShortcuts([null, { code: 'es', name: 'Spanish' }]);
+    translator.setEnabled(true);
+    textarea.focus();
+    textarea.setSelectionRange(6, 11);
+    expect(shortcut(textarea, 2, { key: '@' })).toBe(false);
+    await vi.waitFor(() => expect(textarea.value).toBe('Hello mundo'));
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'TRANSLATE_DRAFT',
+      payload: expect.objectContaining({ text: 'world', targetLanguage: { code: 'es', name: 'Spanish' } }),
+    });
+    expect(textarea.selectionStart).toBe(11);
+    expect(document.activeElement).toBe(textarea);
+    expect(submit).not.toHaveBeenCalled();
+    expect(writingShadow().querySelector('[role="dialog"]')).toBeNull();
+    expect(setStorage).toHaveBeenCalledWith(expect.objectContaining({
+      'fastAiTranslator.writingTargets': expect.arrayContaining([
+        expect.objectContaining({ target: { code: 'es', name: 'Spanish' } }),
+      ]),
+    }));
+  });
+
+  it.each(['input', 'textarea', 'contenteditable'])('replaces the full %s draft directly', async (kind) => {
+    document.body.innerHTML = kind === 'input' ? '<input value="Hello world">'
+      : kind === 'textarea' ? '<textarea>Hello world</textarea>'
+      : '<div contenteditable="true" tabindex="0">Hello world</div>';
+    const editor = document.body.firstElementChild as HTMLElement;
+    translator = new WritingTranslator(document);
+    translator.setEnabled(true);
+    editor.focus();
+    shortcut(editor);
+    await vi.waitFor(() => expect(editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement
+      ? editor.value : editor.textContent).toBe('mundo'));
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'TRANSLATE_DRAFT', payload: expect.objectContaining({ text: 'Hello world', targetLanguage: { code: 'en', name: 'English' } }),
+    });
+  });
+
+  it('updates React controlled textarea state when replacing', async () => {
+    function ControlledDraft() {
+      const [draft, setDraft] = useState('Hello');
+      return <><textarea aria-label="Draft" value={draft} onChange={(event) => setDraft(event.target.value)} /><output>{draft}</output></>;
+    }
+    const view = render(<ControlledDraft />);
+    translator = new WritingTranslator(document);
+    translator.setEnabled(true);
+    const editor = view.getByRole('textbox');
+    editor.focus();
+    shortcut(editor);
+    await vi.waitFor(() => expect(view.getByRole('status')).toHaveTextContent('mundo'));
+    expect(editor).toHaveValue('mundo');
+  });
+
+  it('applies changed assignments immediately and respects cleared slots', async () => {
+    document.body.innerHTML = '<input value="Hello">';
+    const editor = document.querySelector('input')!;
+    translator = new WritingTranslator(document);
+    translator.setEnabled(true);
+    editor.focus();
+    expect(shortcut(editor, 9)).toBe(true);
+    translator.setShortcuts([null, ...Array(7).fill(null), { code: 'eo', name: 'Esperanto' }]);
+    expect(shortcut(editor)).toBe(true);
+    expect(sendMessage).not.toHaveBeenCalled();
+    shortcut(editor, 9);
+    await vi.waitFor(() => expect(editor.value).toBe('mundo'));
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'TRANSLATE_DRAFT', payload: expect.objectContaining({ targetLanguage: { code: 'eo', name: 'Esperanto' } }),
+    });
+  });
+
+  it('ignores repeats, composition, extra modifiers, protected fields, and keys outside the editor', () => {
+    document.body.innerHTML = '<input value="Hello"><input type="password" value="private">';
+    const editor = document.querySelector('input')!;
+    translator = new WritingTranslator(document);
+    translator.setEnabled(true);
+    editor.focus();
+    for (const extra of [{ repeat: true }, { isComposing: true }, { ctrlKey: true }, { metaKey: true }]) {
+      expect(shortcut(editor, 1, extra)).toBe(true);
+    }
+    expect(shortcut(document.body)).toBe(true);
+    const password = document.querySelector('input[type="password"]') as HTMLInputElement;
+    password.focus();
+    expect(shortcut(password)).toBe(true);
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('cancels the previous target and applies only the latest shortcut result', async () => {
+    const responses = delayDraftResponses();
+    document.body.innerHTML = '<textarea>Hello</textarea>';
+    const editor = document.querySelector('textarea')!;
+    translator = new WritingTranslator(document);
+    translator.setShortcuts([{ code: 'en', name: 'English' }, { code: 'hi', name: 'Hindi' }]);
+    translator.setEnabled(true);
+    editor.focus();
+    shortcut(editor);
+    shortcut(editor, 2);
+    expect(responses).toHaveLength(2);
+    responses[1]!('Namaste');
+    await vi.waitFor(() => expect(editor.value).toBe('Namaste'));
+    responses[0]!('Old result');
+    await Promise.resolve();
+    expect(editor.value).toBe('Namaste');
+    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'CANCEL_DRAFT_TRANSLATION' }));
+  });
+
+  it.each(['edit', 'silent-edit', 'blur', 'window-blur', 'disable', 'escape', 'remove'])('never replaces a pending draft after %s', async (action) => {
+    const responses = delayDraftResponses();
+    document.body.innerHTML = '<textarea>Hello</textarea>';
+    const editor = document.querySelector('textarea')!;
+    translator = new WritingTranslator(document);
+    translator.setEnabled(true);
+    editor.focus();
+    shortcut(editor);
+    await vi.waitFor(() => expect(writingShadow().textContent).toContain('Translating to English'));
+    if (action === 'edit' || action === 'silent-edit') editor.value = 'New draft';
+    if (action === 'edit') fireEvent.input(editor);
+    if (action === 'blur') editor.blur();
+    if (action === 'window-blur') window.dispatchEvent(new Event('blur'));
+    if (action === 'disable') translator.setEnabled(false);
+    if (action === 'escape') fireEvent.keyDown(editor, { key: 'Escape' });
+    if (action === 'remove') editor.remove();
+    responses[0]!('Stale translation');
+    await Promise.resolve();
+    expect(editor.value).toBe(action.endsWith('edit') ? 'New draft' : 'Hello');
+  });
+
+  it('keeps the original draft on failure and lets Retry finish the direct replacement', async () => {
+    document.body.innerHTML = '<input value="Hello">';
+    const editor = document.querySelector('input')!;
+    translator = new WritingTranslator(document);
+    translator.setEnabled(true);
+    editor.focus();
+    sendMessage.mockRejectedValueOnce(new Error('Provider unavailable'));
+    shortcut(editor);
+    await vi.waitFor(() => expect(writingShadow().textContent).toContain('Provider unavailable'));
+    expect(editor.value).toBe('Hello');
+    const retry = [...writingShadow().querySelectorAll('button')].find((button) => button.textContent === 'Retry')!;
+    retry.focus();
+    fireEvent.click(retry);
+    await vi.waitFor(() => expect(editor.value).toBe('mundo'));
   });
 });
